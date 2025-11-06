@@ -1,0 +1,313 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String   @id @default(auto()) @map("_id") @db.ObjectId
+  username          String   @unique
+  email             String   @unique
+  name              String?
+  password          String
+  role              UserRole @default(USER)
+  mobile            String?
+  countryCode       String?
+  isVerified        Boolean  @default(false)
+  isActive          Boolean  @default(false)
+  householdSize     Int      @default(1)
+  dietaryPreference String   @default("vegetarian")
+  shoppingFrequency String   @default("weekly")
+
+  sessions         Session[]
+  events           SecurityEvent[]
+  settings         UserSettings?
+  createdGroups    FamilyGroup[]        @relation("FamilyGroupCreator") // Groups created by this user
+  memberOfGroups   FamilyGroupMember[] // Groups this user is a member of
+  contributedLists ListContributor[] // Lists this user contributes to
+  sharedCategories CategorySharedWith[] // Categories shared with this user
+
+  Otp               Otp[]
+  Item              Item[]
+  List              List[]
+  Comment           Comment[]
+  createdCategories Category[] @relation("CategoryCreatedBy")
+  sentInvites       Invite[]   @relation("InviteSender") // Invites sent by this user
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Session {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceId         String // persistent local identifier
+  refreshTokenHash String // hash only, never raw token
+  userAgent        String?
+  platform         String? // iOS/Android/Linux/Windows/Mac
+  browser          String? // Chrome/Safari/Edge/Firefox
+  ipAddress        String? // for risk scoring, NOT identity
+  createdAt        DateTime @default(now())
+  lastUsed         DateTime @default(now())
+  revoked          Boolean  @default(false)
+
+  @@index([userId])
+  @@index([deviceId])
+}
+
+model SecurityEvent {
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  type      String // login, logout, logout_all, suspicious_attempt
+  deviceId  String?
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model UserSettings {
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  userId String @unique @db.ObjectId
+
+  notifications NotificationSettings
+  privacy       PrivacySettings
+  appearance    AppearanceSettings
+  accessibility AccessibilitySettings
+
+  timezone String @default("UTC")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+type NotificationSettings {
+  email          Boolean @default(true)
+  sms            Boolean @default(false)
+  push           Boolean @default(true)
+  marketing      Boolean @default(false)
+  productUpdates Boolean @default(true)
+  securityAlerts Boolean @default(true)
+}
+
+type PrivacySettings {
+  profileVisibility String  @default("private") // private | friends | public
+  searchVisibility  Boolean @default(false)
+  dataSharing       Boolean @default(false)
+  adPersonalization Boolean @default(false)
+  twoFactorAuth     Boolean @default(true)
+}
+
+type AppearanceSettings {
+  theme              String  @default("system") // light | dark | system
+  fontSize           String  @default("medium")
+  compactMode        Boolean @default(false)
+  animations         Boolean @default(true)
+  highContrastMode   Boolean @default(false)
+  colorBlindFriendly Boolean @default(false)
+  language           String  @default("en")
+  currency           String  @default("INR")
+  measuringUnits     String  @default("metric")
+  dateFormat         String  @default("DD/MM/YYYY")
+}
+
+type AccessibilitySettings {
+  screenReader    Boolean @default(false)
+  textToSpeech    Boolean @default(false)
+  motionReduction Boolean @default(false)
+}
+
+model FamilyGroup {
+  id        String              @id @default(auto()) @map("_id") @db.ObjectId
+  name      String
+  createdBy String              @db.ObjectId
+  creator   User                @relation("FamilyGroupCreator", fields: [createdBy], references: [id], onDelete: Cascade)
+  members   FamilyGroupMember[]
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+  invites   Invite[]
+
+  @@index([createdBy])
+}
+
+model FamilyGroupMember {
+  id       String      @id @default(auto()) @map("_id") @db.ObjectId
+  groupId  String      @db.ObjectId
+  userId   String      @db.ObjectId
+  group    FamilyGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user     User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  joinedAt DateTime    @default(now())
+
+  @@unique([groupId, userId])
+  @@index([groupId])
+  @@index([userId])
+}
+
+model Invite {
+  id            String       @id @default(auto()) @map("_id") @db.ObjectId
+  code          String       @unique
+  invitedBy     String       @db.ObjectId
+  invitedByUser User         @relation("InviteSender", fields: [invitedBy], references: [id], onDelete: Cascade)
+  email         String
+  role          UserRole     @default(USER)
+  expiresAt     DateTime
+  used          Boolean      @default(false)
+  familyGroupId String?      @db.ObjectId
+  familyGroup   FamilyGroup? @relation(fields: [familyGroupId], references: [id])
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@index([invitedBy])
+  @@index([familyGroupId])
+}
+
+model List {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  name          String
+  slug          String   @unique
+  description   String?
+  createdUserId String   @map("userId") @db.ObjectId
+  createdUser   User     @relation(fields: [createdUserId], references: [id])
+  status        String   @default("active")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  contributors ListContributor[]
+  items        Item[]            @relation("ListItems")
+
+  @@index([createdUserId])
+}
+
+model ListContributor {
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  listId String @db.ObjectId
+  userId String @db.ObjectId
+
+  list List @relation(fields: [listId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([listId, userId])
+  @@index([listId])
+  @@index([userId])
+}
+
+model Category {
+  id            String               @id @default(auto()) @map("_id") @db.ObjectId
+  name          String
+  slug          String               @unique
+  icon          String?
+  color         String?
+  type          CategoryType         @default(CUSTOM)
+  isActive      Boolean              @default(true)
+  createdBy     String?              @default("") @db.ObjectId
+  createdByUser User?                @relation("CategoryCreatedBy", fields: [createdBy], references: [id])
+  sharedWith    CategorySharedWith[]
+  categoryItems Item[]               @relation("CategoryItems")
+  meta          Json?
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+}
+
+model CategorySharedWith {
+  id         String @id @default(auto()) @map("_id") @db.ObjectId
+  categoryId String @db.ObjectId
+  userId     String @db.ObjectId
+
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([categoryId, userId])
+  @@index([categoryId])
+  @@index([userId])
+}
+
+model Item {
+  id             String       @id @default(auto()) @map("_id") @db.ObjectId
+  name           String
+  description    String?
+  quantity       Int
+  unit           String?
+  priority       PriorityType @default(LOW)
+  completed      Boolean      @default(false)
+  note           String?
+  listId         String?      @db.ObjectId
+  list           List?        @relation("ListItems", fields: [listId], references: [id])
+  categoryId     String       @db.ObjectId
+  category       Category     @relation("CategoryItems", fields: [categoryId], references: [id])
+  brand          String?
+  estimatedPrice Float
+  addedUserId    String       @map("userId") @db.ObjectId
+  addedBy        User         @relation(fields: [addedUserId], references: [id])
+  completedAt    DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  comments       Comment[]
+
+  @@index([listId])
+  @@index([categoryId])
+  @@index([addedUserId])
+}
+
+model Comment {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  content   String
+  itemId    String   @db.ObjectId
+  item      Item     @relation(fields: [itemId], references: [id])
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([itemId])
+  @@index([userId])
+}
+
+// All Enum types used in the models
+
+enum UserRole {
+  ADMIN
+  USER
+}
+
+enum CategoryType {
+  SYSTEM
+  CUSTOM
+}
+
+enum PriorityType {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum OtpType {
+  LOGIN
+  RESET_PASSWORD
+}
+
+// Extra helper models go here
+model Otp {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id])
+  code      String
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  @@index([userId])
+}
