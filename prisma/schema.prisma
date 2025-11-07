@@ -6,7 +6,7 @@
 
 generator client {
   provider      = "prisma-client-js"
-  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+  binaryTargets = ["native", "debian-openssl-3.0.x", "rhel-openssl-3.0.x"]
   output        = "../generated/prisma"
 }
 
@@ -16,37 +16,34 @@ datasource db {
 }
 
 model User {
-  id                String   @id @default(auto()) @map("_id") @db.ObjectId
-  username          String   @unique
-  email             String   @unique
+  id                String               @id @default(auto()) @map("_id") @db.ObjectId
+  username          String               @unique
+  email             String               @unique
   name              String?
   password          String
-  role              UserRole @default(USER)
+  role              UserRole             @default(USER)
   mobile            String?
   countryCode       String?
-  isVerified        Boolean  @default(false)
-  isActive          Boolean  @default(false)
-  householdSize     Int      @default(1)
-  dietaryPreference String   @default("vegetarian")
-  shoppingFrequency String   @default("weekly")
-
-  sessions         Session[]
-  events           SecurityEvent[]
-  settings         UserSettings?
-  createdGroups    FamilyGroup[]        @relation("FamilyGroupCreator") // Groups created by this user
-  memberOfGroups   FamilyGroupMember[] // Groups this user is a member of
-  contributedLists ListContributor[] // Lists this user contributes to
-  sharedCategories CategorySharedWith[] // Categories shared with this user
-
+  isVerified        Boolean              @default(false)
+  isActive          Boolean              @default(false)
+  householdSize     Int                  @default(1)
+  dietaryPreference String               @default("vegetarian")
+  shoppingFrequency String               @default("weekly")
+  sessions          Session[]
+  events            SecurityEvent[]
+  settings          UserSettings?
+  createdGroups     FamilyGroup[]        @relation("FamilyGroupCreator") // Groups created by this user
+  memberOfGroups    FamilyGroupMember[] // Groups this user is a member of
+  contributedLists  ListContributor[] // Lists this user contributes to
+  sharedCategories  CategorySharedWith[] // Categories shared with this user
   Otp               Otp[]
   Item              Item[]
   List              List[]
   Comment           Comment[]
-  createdCategories Category[] @relation("CategoryCreatedBy")
-  sentInvites       Invite[]   @relation("InviteSender") // Invites sent by this user
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdCategories Category[]           @relation("CategoryCreatedBy")
+  sentInvites       Invite[]             @relation("InviteSender") // Invites sent by this user
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
 }
 
 model Session {
@@ -60,6 +57,7 @@ model Session {
   browser          String? // Chrome/Safari/Edge/Firefox
   ipAddress        String? // for risk scoring, NOT identity
   createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
   lastUsed         DateTime @default(now())
   revoked          Boolean  @default(false)
 
@@ -80,20 +78,16 @@ model SecurityEvent {
 }
 
 model UserSettings {
-  id     String @id @default(auto()) @map("_id") @db.ObjectId
-  userId String @unique @db.ObjectId
-
+  id            String                @id @default(auto()) @map("_id") @db.ObjectId
+  userId        String                @unique @db.ObjectId
   notifications NotificationSettings
   privacy       PrivacySettings
   appearance    AppearanceSettings
   accessibility AccessibilitySettings
-
-  timezone String @default("UTC")
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  timezone      String                @default("UTC")
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+  user          User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 type NotificationSettings {
@@ -146,12 +140,13 @@ model FamilyGroup {
 }
 
 model FamilyGroupMember {
-  id       String      @id @default(auto()) @map("_id") @db.ObjectId
-  groupId  String      @db.ObjectId
-  userId   String      @db.ObjectId
-  group    FamilyGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  user     User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  joinedAt DateTime    @default(now())
+  id        String      @id @default(auto()) @map("_id") @db.ObjectId
+  groupId   String      @db.ObjectId
+  userId    String      @db.ObjectId
+  group     FamilyGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
 
   @@unique([groupId, userId])
   @@index([groupId])
@@ -177,29 +172,29 @@ model Invite {
 }
 
 model List {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  id            String            @id @default(auto()) @map("_id") @db.ObjectId
   name          String
-  slug          String   @unique
+  slug          String            @unique
   description   String?
-  createdUserId String   @map("userId") @db.ObjectId
-  createdUser   User     @relation(fields: [createdUserId], references: [id])
-  status        String   @default("active")
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  contributors ListContributor[]
-  items        Item[]            @relation("ListItems")
+  createdUserId String            @map("userId") @db.ObjectId
+  createdUser   User              @relation(fields: [createdUserId], references: [id])
+  status        String            @default("active")
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  contributors  ListContributor[]
+  items         Item[]            @relation("ListItems")
 
   @@index([createdUserId])
 }
 
 model ListContributor {
-  id     String @id @default(auto()) @map("_id") @db.ObjectId
-  listId String @db.ObjectId
-  userId String @db.ObjectId
-
-  list List @relation(fields: [listId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  listId    String   @db.ObjectId
+  list      List     @relation(fields: [listId], references: [id], onDelete: Cascade)
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([listId, userId])
   @@index([listId])
@@ -224,12 +219,13 @@ model Category {
 }
 
 model CategorySharedWith {
-  id         String @id @default(auto()) @map("_id") @db.ObjectId
-  categoryId String @db.ObjectId
-  userId     String @db.ObjectId
-
-  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  categoryId String   @db.ObjectId
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  userId     String   @db.ObjectId
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   @@unique([categoryId, userId])
   @@index([categoryId])
@@ -306,8 +302,9 @@ model Otp {
   userId    String   @db.ObjectId
   user      User     @relation(fields: [userId], references: [id])
   code      String
-  createdAt DateTime @default(now())
   expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([userId])
 }
